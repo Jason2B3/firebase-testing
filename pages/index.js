@@ -1,27 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { firebaseGET, firebasePOST } from "../helpers/requests";
+import { firebaseGET, firebasePOST, reformat } from "../helpers/requests";
 import classes from "./index.module.css";
 
-export async function getStaticProps(context) {
+export async function getServerSideProps(context) {
   const firebaseLink =
     "https://auth-learn-ca7ef-default-rtdb.firebaseio.com/test.json";
+
   const pullData = await fetch(firebaseLink);
   const parsedData = await pullData.json();
-  let show404 = false;
-  if (!parsedData) show404 = true;
+  const arrayVersion = reformat(parsedData); // obj → array
 
-  // Reorganize the object data Firebase returns and place it in an array
-  function reformat(obj) {
-    let arr = [];
-    for (let k in obj) arr.push(obj[k]);
-    return arr;
-  }
-  const arrayVersion = reformat(parsedData);
   return {
-    // feed your new array as the comp ƒ() props
     props: { display: arrayVersion },
-    notFound: show404,
-    // no need for revalidate since SSR will fire again after each new request
   };
 }
 
@@ -32,18 +22,24 @@ export default function index({ display }) {
   const firebaseLink =
     "https://auth-learn-ca7ef-default-rtdb.firebaseio.com/test.json";
 
-  // Send data to Firebase backend
+  // Send data to Firebase backend, and update the list browser-side as well
   function postHandler(e) {
-    // e.preventDefault();
+    e.preventDefault();
     firebasePOST(firebaseLink, inputRef.current.value);
-    //! Find a way to update the rendered list
-    setList((prevState) => {
-      prevState.push(inputRef.current.value);
-      return prevState;
-    });
-    inputRef.current.value = "";
+    setList((prev) => [...prev, inputRef.current.value]);
+    // inputRef.current.value="" // causes a bug where list items get rendered blank
   }
 
+  // Give people a chance to send data up if your list is empty
+  if (!list) {
+    return (
+      <div>
+        <button onClick={postHandler}>POST on backend</button>
+        <input ref={inputRef} placeholder="Will be sent to Firebase..."></input>
+      </div>
+    );
+  }
+  // If we do have data in our backend, render the following
   return (
     <section className={classes.section}>
       <h1>Current data on the backend:</h1>
